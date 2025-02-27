@@ -14,7 +14,7 @@ beforeEach(async () => {
 })
 
 describe('api tests', () => {
-  test.only('returns correct number of blogs as json', async () => {
+  test('returns correct number of blogs as json', async () => {
     const response = await api
       .get('/api/blogs')
       .expect('Content-Type', /application\/json/)
@@ -22,15 +22,15 @@ describe('api tests', () => {
     assert.strictEqual(response.body.length, listHelper.initialBlogs.length)
   })
 
-  test.only('unique identifier is named "id" in blogs', async () => {
+  test('unique identifier is named "id" in blogs', async () => {
     const response = await api.get('/api/blogs')
     for(let blog of response.body) {
       assert(Object.keys(blog).includes('id'))
     }
   })
 
-  test.only('new blog can be created and reflected in db', async () => {
-    const newBlog = {
+  test('new blog can be created and reflected in db', async () => {
+    const blogObject = {
       title: 'testing in backend',
       author: 'someone',
       url: 'https://google.com',
@@ -39,7 +39,7 @@ describe('api tests', () => {
 
     await api
       .post('/api/blogs')
-      .send(newBlog)
+      .send(blogObject)
       .expect(201)
       .expect('Content-Type', /application\/json/)
 
@@ -47,7 +47,39 @@ describe('api tests', () => {
     assert.strictEqual(blogsAtEnd.length, listHelper.initialBlogs.length + 1)
 
     const titles = blogsAtEnd.map(blog => blog.title)
-    assert(titles.includes(newBlog.title))
+    assert(titles.includes(blogObject.title))
+  })
+
+  test('new blog without "likes" property saves default to 0', async () => {
+    const blogObject = {
+      title: 'testing a blog without like property',
+      author: 'someone',
+      url: 'https://google.com'
+    }
+
+    const response = await api
+      .post('/api/blogs')
+      .send(blogObject)
+      .expect(201)
+      .expect('Content-Type', /application\/json/)
+
+    assert(Object.keys(response.body).includes('likes'))
+    assert.strictEqual(response.body.likes, 0)
+  })
+
+  test('creating new blog without title or url gives error', async () => {
+    await api
+      .post('/api/blogs')
+      .send({ author: 'someone', url: 'https://google.com' })
+      .expect(400)
+    
+    await api
+      .post('/api/blogs')
+      .send({ title: 'testing blog without url', author: 'someone' })
+      .expect(400)
+      
+    const blogsAtEnd = await listHelper.blogsInDb()
+    assert.strictEqual(blogsAtEnd.length, listHelper.initialBlogs.length)
   })
 })
 
