@@ -1,6 +1,55 @@
-const { test, describe } = require('node:test')
+const { test, describe, after, beforeEach } = require('node:test')
 const assert = require('node:assert')
+const mongoose = require('mongoose')
+const supertest = require('supertest')
+const app = require('../app')
+const Blog = require('../models/blog')
 const listHelper = require('../utils/list_helper')
+
+const api = supertest(app)
+
+beforeEach(async () => {
+  await Blog.deleteMany({})
+  await Blog.insertMany(listHelper.initialBlogs)
+})
+
+describe('api tests', () => {
+  test.only('returns correct number of blogs as json', async () => {
+    const response = await api
+      .get('/api/blogs')
+      .expect('Content-Type', /application\/json/)
+
+    assert.strictEqual(response.body.length, listHelper.initialBlogs.length)
+  })
+
+  test.only('unique identifier is named "id" in blogs', async () => {
+    const response = await api.get('/api/blogs')
+    for(let blog of response.body) {
+      assert(Object.keys(blog).includes('id'))
+    }
+  })
+
+  test.only('new blog can be created and reflected in db', async () => {
+    const newBlog = {
+      title: 'testing in backend',
+      author: 'someone',
+      url: 'https://google.com',
+      likes: 4
+    }
+
+    await api
+      .post('/api/blogs')
+      .send(newBlog)
+      .expect(201)
+      .expect('Content-Type', /application\/json/)
+
+    const blogsAtEnd = await listHelper.blogsInDb()
+    assert.strictEqual(blogsAtEnd.length, listHelper.initialBlogs.length + 1)
+
+    const titles = blogsAtEnd.map(blog => blog.title)
+    assert(titles.includes(newBlog.title))
+  })
+})
 
 const listWithOneBlog = [
   {
@@ -133,4 +182,8 @@ test('dummy returns one',() => {
 
   const result = listHelper.dummy(blogs)
   assert.strictEqual(result, 1)
+})
+
+after(async () => {
+  await mongoose.connection.close()
 })
